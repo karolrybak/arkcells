@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { Event, Lab, Listen } from "../src" // dostosuj ścieżki
+import { Event, Lab, Listen } from "../src"
 
 describe("M Arkcells Tracing API", () => {
 	it("should correlate child events with parent trace id", async () => {

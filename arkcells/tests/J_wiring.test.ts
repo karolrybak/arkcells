@@ -17,7 +17,7 @@ describe("J. Host / Endo / Flora Wiring", () => {
 		const child = Lab.clone<childGenome>(
 			childDna,
 			{
-				compute: async (n: number) => {
+				async compute(n) {
 					return n * 10
 				},
 			},
@@ -28,10 +28,8 @@ describe("J. Host / Endo / Flora Wiring", () => {
 		const parent = Lab.clone<parentGenome>(
 			parentDna,
 			{
-				async exec(n: number) {
-					// Parent accesses child membrane via flora.endo
+				async exec(n) {
 					capturedResult = await this.endo.c.compute(n)
-					console.log(`ciapek ${n}`)
 				},
 			},
 			{ version: "p" }
@@ -72,7 +70,6 @@ describe("J. Host / Endo / Flora Wiring", () => {
 			childDna,
 			{
 				async trigger() {
-					// host should be visible but restricted
 					if (this.host) {
 						// @ts-expect-error: host events are not callable from child
 						expect(this.host.calc).toBeUndefined()

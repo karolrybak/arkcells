@@ -85,8 +85,6 @@ Use `Lab.mix(nucleiDna)` to begin composing a genome:
 - `endo`: optional child DNA map
 - `host`: optional parent DNA
 
-(Your library’s exact `mix` composition API determines how endo/host are attached; the intent is that the full genome is known at typing time.)
-
 ### 4) Craft / clone
 
 - `Lab.clone(genomeOrDna, nexus, cistern)` creates a cell instance.

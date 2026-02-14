@@ -10,7 +10,6 @@ describe("K. Listen behavior (event listener)", () => {
 	it("K2. Parent Event triggers child Listen via Implicit Map", () => {
 		const rSpy = vi.fn()
 		const parentDna = Lab.sequence({ version: Config("string"), msg: Event("string") })
-		// Implicit mapping Listen to host.event.msg
 		const childDna = Lab.sequence({ version: Config("string"), msg: Listen("string") })
 		type childGenome = Lab.Mix<typeof childDna>
 		const child = Lab.clone<childGenome>(childDna, { msg: rSpy }, { version: "c" })

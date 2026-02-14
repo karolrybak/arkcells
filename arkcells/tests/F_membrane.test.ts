@@ -35,7 +35,6 @@ describe("F. Membrane Proxy (API behavior)", () => {
 		cell.api.t(10)
 		expect(cell.api.t()).toBe(10)
 		expect(iSpy).toHaveBeenCalledWith(10)
-		// Probes now receive { prev, next }
 		expect(pSpy).toHaveBeenCalledWith({ prev: 0, next: 10 })
 	})
 })
