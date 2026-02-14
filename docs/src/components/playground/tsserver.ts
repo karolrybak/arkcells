@@ -1,0 +1,57 @@
+import type * as Monaco from "monaco-editor"
+import { regexDts } from "../dts/regex.ts"
+import { schemaDts } from "../dts/schema.ts"
+import { typeDts } from "../dts/type.ts"
+import { utilDts } from "../dts/util.ts"
+
+const configureTypeScript = async (monaco: typeof Monaco): Promise<void> => {
+	const tsDefaultModeConfig = (
+		monaco.languages.typescript.typescriptDefaults as any
+	)._modeConfiguration
+	// Keep diagnostic features but disable built-in hovers/completions
+	// since we'll handle those ourselves
+	tsDefaultModeConfig.hovers = true
+	tsDefaultModeConfig.completionItems = true
+
+	monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+		strict: true,
+		exactOptionalPropertyTypes: true,
+		target: monaco.languages.typescript.ScriptTarget.ESNext,
+		moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+		module: monaco.languages.typescript.ModuleKind.ESNext,
+		allowNonTsExtensions: true,
+		skipLibCheck: true,
+		allowSyntheticDefaultImports: true,
+		esModuleInterop: true,
+		resolveJsonModule: true
+	})
+
+	// Load full source code from arkcells_full.ts
+	const arkcellsModule = await import("../../arkcells_full.ts?raw")
+	monaco.languages.typescript.typescriptDefaults.addExtraLib(
+		arkcellsModule.default,
+		"file:///node_modules/arkcells/index.ts"
+	)
+
+
+	monaco.languages.typescript.typescriptDefaults.addExtraLib(utilDts)
+	monaco.languages.typescript.typescriptDefaults.addExtraLib(schemaDts)
+	monaco.languages.typescript.typescriptDefaults.addExtraLib(typeDts)
+	monaco.languages.typescript.typescriptDefaults.addExtraLib(regexDts)
+
+}
+
+export const getInitializedTypeScriptService = async (
+	monaco: typeof Monaco,
+	editorFileUri: string,
+	contents: string
+): Promise<Monaco.languages.typescript.TypeScriptWorker> => {
+	const targetUri = monaco.Uri.parse(editorFileUri)
+	await configureTypeScript(monaco)
+
+	if (!monaco.editor.getModel(targetUri))
+		monaco.editor.createModel(contents, "typescript", targetUri)
+
+	const worker = await monaco.languages.typescript.getTypeScriptWorker()
+	return await worker(targetUri)
+}

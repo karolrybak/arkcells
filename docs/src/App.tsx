@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Playground } from "./components/playground/Playground.tsx";
-import "./index.css";
-import logo from "./logo.svg";
-import docs from "../content/full.md?raw"
+import { Playground } from "@/components/playground/Playground.tsx";
+import "@/index.css";
+import logo from "@/logo.svg";
+import docs from "@/full.md?raw"
 import Markdown from 'react-markdown'
 import remarkGfm from "remark-gfm"
 

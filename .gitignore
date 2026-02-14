@@ -44,7 +44,7 @@ brudnopis/
 coverage/
 cellforge
 oldgit
-playground
+/playground
 themes
 
 # Attest / Testing
