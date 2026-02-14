@@ -1,5 +1,5 @@
 import type * as Monaco from "monaco-editor"
-import arkdarkTheme from "../../../../themes/arkdark.json"
+import arkdarkTheme from "@/arkdark.json"
 
 interface VSCodeTheme {
     colors: {
