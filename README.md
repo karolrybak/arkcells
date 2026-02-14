@@ -3,7 +3,8 @@
 **ArkCells** is a type-safe framework for building modular, composable software organisms powered by **ArkType**.
 It turns runtime schemas into fully-typed, validated APIs and enforces strict architectural boundaries inspired by cellular biology.
 
-👉 **Docs & Playground:** [https://3ksoft.org/arkcells](https://3ksoft.org/arkcells)
+👉 **Docs & Playground:** [https://karolrybak.github.io/arkcells/](https://karolrybak.github.io/arkcells/)
+
 
 ---
 

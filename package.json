@@ -10,8 +10,7 @@
   ],
   "scripts": {
     "test": "cd arkcells && bun install && bun run test",
-    "build": "bun run build -w arkcells",
-    "lint": "bun run lint -w arkcells"
+    "build": "cd arkcells && bun run build -w arkcells"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
