@@ -1,7 +1,0 @@
-{
-  "extension": ["ts"],
-  "loader": "tsx",
-  "require": ["@ark/attest/setup"],
-  "spec": "test/**/*.test.ts",
-  "timeout": 30000
-}
