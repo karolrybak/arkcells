@@ -53,3 +53,20 @@ body {
 .prose th {
   @apply bg-gray-900;
 }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}

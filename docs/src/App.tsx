@@ -41,9 +41,9 @@ export function App() {
             </svg>
           </a>
         </div>
-        <div className="w-full flex flex-row border-r border-gray-800">
-          <div className="w-3/5">
-            <div className="flex border-b border-gray-800 bg-[#0d1117]">
+        <div className="w-full flex flex-row border-r border-gray-800 flex-grow overflow-hidden">
+          <div className="w-3/5 flex flex-col overflow-hidden">
+            <div className="flex border-b border-gray-800 bg-[#0d1117] flex-shrink-0 ">
               {Object.entries(DOCS).map(([key, doc]) => (
                 <button type="button"
                   key={key}
