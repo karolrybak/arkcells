@@ -12,7 +12,6 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.1.18",
-    "arkcells": "workspace:*",
     "bun-plugin-tailwind": "^0.1.2",
     "lucide-react": "^0.563.0",
     "monaco-editor": "^0.52.2",
