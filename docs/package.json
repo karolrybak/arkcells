@@ -10,21 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ark/attest": "^0.56.0",
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.1.18",
-    "@typescript/ata": "^0.9.8",
     "arkcells": "workspace:*",
-    "arktype": "^2.1.29",
     "bun-plugin-tailwind": "^0.1.2",
     "lucide-react": "^0.563.0",
-    "mermaid.cli": "^0.5.1",
     "monaco-editor": "^0.52.2",
     "react": "^19",
     "react-dom": "^19",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "remark-mermaid": "^0.2.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
