@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Build artifacts
+dist/
+out/
+build/
+*.tgz
+*.tsbuildinfo
+
+# Code coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# Environment files
+.env
+.env.*.local
+.env.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+brudnopis/
+.pod/
+coverage/
+cellforge
+oldgit
+playground
+themes
+
+# Attest / Testing
+.attest/
+__snapshots__/
+temp/

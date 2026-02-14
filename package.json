@@ -1,0 +1,22 @@
+{
+  "name": "arkcells-monorepo",
+  "version": "0.0.56",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "arkcells",
+    "docs",
+    "cellforge"
+  ],
+  "scripts": {
+    "test": "cd arkcells && bun install && bun run test",
+    "build": "bun run build -w arkcells",
+    "lint": "bun run lint -w arkcells"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@types/bun": "^1.3.8"
+  }
+}

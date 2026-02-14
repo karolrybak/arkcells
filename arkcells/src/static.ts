@@ -1,0 +1,5 @@
+export const Config = <const I>(req: I) => ({ type: "'config'" as const, req })
+export const Event = <const I>(req: I) => ({ type: "'event'" as const, req })
+export const Listen = <const I>(req: I) => ({ type: "'listen'" as const, req })
+export const State = <const I>(req: I) => ({ type: "'state'" as const, req, def: "unknown.any" as const })
+export const Query = <const I, const O>(req: I, res: O) => ({ type: "'query'" as const, req, res })

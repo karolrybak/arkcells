@@ -1,0 +1,74 @@
+{
+  "name": "arkcells",
+  "version": "0.0.22",
+  "description": "ArkCells library",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "arkcells",
+    "typescript",
+    "arktype"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/arkcells.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/arkcells/issues"
+  },
+  "homepage": "https://github.com/your-org/arkcells#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
+  "packageManager": "bun@1.0.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint src --fix",
+    "format": "biome format src --write",
+    "fformat": "biome check --write --unsafe",
+    "check": "biome check src",
+    "dev": "bun src/index.ts",
+    "clean": "rimraf ./dist",
+    "prepublishOnly": "npm run build && npm run check",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "devDependencies": {
+    "@ark/attest": "^0.56.0",
+    "@biomejs/biome": "^2.3.13",
+    "@prettier/sync": "0.6.1",
+    "@types/bun": "latest",
+    "@typescript/analyze-trace": "0.10.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260131.1",
+    "@typescript/vfs": "1.6.1",
+    "prettier": "3.6.2",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "arktype": "^2.1.29",
+    "type-fest": "^5.4.4"
+  }
+}

@@ -1,0 +1,692 @@
+import  { type, type Type, type Module, type Scope, scope } from "arktype"
+import type { Default } from "arktype/internal/attributes.ts"
+import { arkKind } from "@ark/schema"
+
+export class CellsInvariantError extends Error {
+	constructor(message: string) {
+		super(`[ArkCells] ${message}`)
+	}
+}
+
+export class Inhibited extends Error {
+	constructor(message: string) {
+		super(`[ArkCells] [Inhibitor Activated] ${message}`)
+	}
+}
+
+export function panic(message: string): never {
+	throw new CellsInvariantError(message)
+}
+
+export const AminoTypes = {
+    Config: "config",
+    Query: "query",
+    Event: "event",
+    Listen: "listen",
+    State: "state",
+} as const
+
+type UnwrapDefault<T> = T extends Default<infer Base, any> ? Base : T
+
+export type ConfigShape<I = any> = { type: typeof AminoTypes.Config; req: I }
+export type EventShape<I = any> = { type: typeof AminoTypes.Event; req: I }
+export type ListenShape<I = any> = { type: typeof AminoTypes.Listen; req: I }
+export type StateShape<I = any, D = any> = { type: typeof AminoTypes.State; req: I; def: D }
+export type QueryShape<I = any, O = any> = { type: typeof AminoTypes.Query; req: I; res: O }
+
+export type Amino = ConfigShape<any> | EventShape<any> | ListenShape<any> | StateShape<any> | QueryShape<any, any>
+
+export type TypedAmino =
+    | Type<ConfigShape<any>, any>
+    | Type<EventShape<any>, any>
+    | Type<ListenShape<any>, any>
+    | Type<StateShape<any>, any>
+    | Type<QueryShape<any, any>, any>
+
+export type AminoKind = Amino["type"]
+
+export type InferReq<A> = A extends { req: infer R }
+    ? R extends { t: infer I }
+        ? UnwrapDefault<I>
+        : R extends { infer: infer I }
+            ? UnwrapDefault<I>
+            : UnwrapDefault<R>
+    : never
+export type InferRes<A> = A extends { res: Type<any> } ? A["res"]["infer"] : never
+export type Infer<Def> = Type<Def>["infer"]
+
+export type Dna<T extends Record<string, Amino> = Record<string, Amino>> = T
+export type DnaMap<T extends Record<string, Dna> = Record<string, Dna>> = T
+export type Genome<N extends Dna = any, E extends DnaMap = any, H extends Dna | undefined = any> = { nuclei: N; endo: E; host: H }
+
+export type PickByKind<R extends Dna, K extends AminoKind> = {
+    [P in keyof R as R[P]["type"] extends K ? P : never]: R[P]
+}
+
+export type KeysByKind<R extends Dna, K extends AminoKind> = Extract<{ [P in keyof R]: R[P]["type"] extends K ? P : never }[keyof R], string>
+
+export type Entries<T extends object> = { [K in keyof T]-?: [K, T[K]] }[keyof T][]
+
+export const entriesOf = <T extends object>(obj: T) => Object.entries(obj) as Entries<T>
+
+type Config = typeof AminoTypes.Config
+type Event = typeof AminoTypes.Event
+type State = typeof AminoTypes.State
+type Query = typeof AminoTypes.Query
+
+export type CisternAminos = Config | State
+export const CisternAminos = [AminoTypes.Config, AminoTypes.State] as const
+export type TransportableAminos = Config | Event | State | Query
+export const TransportableAminos = [AminoTypes.Config, AminoTypes.Event, AminoTypes.State, AminoTypes.Query] as const
+export type ObservableAminos = State | Event | Query
+export const ObservableAminos = [AminoTypes.State, AminoTypes.Event, AminoTypes.Query] as const
+
+export type TransportEvent =
+    | { type: "cell:set"; cellId: string; actionId: string; locus: string; value: unknown; timestamp: number }
+    | { type: "cell:update"; cellId: string; actionId: string; locus: string; prev: unknown; next: unknown; value: unknown; timestamp: number }
+    | { type: "cell:compute:start"; cellId: string; actionId: string; locus: string; timestamp: number }
+    | { type: "cell:compute:end"; cellId: string; actionId: string; locus: string; value: unknown; timestamp: number }
+    | { type: "cell:event"; cellId: string; actionId: string; locus: string; value: unknown; timestamp: number }
+    | { type: "cell:listen"; cellId: string; actionId: string; locus: string; value: unknown; timestamp: number }
+
+type DistributiveOmit<T, K extends keyof any> = T extends any ? Omit<T, K> : never
+
+type Observer = (event: TransportEvent) => void
+
+export type Transport<A extends Record<string, Amino>> = {
+    [K in keyof A]: A[K] extends QueryShape<infer I, infer O>
+        ? (req: Infer<I>) => Promise<Infer<O>>
+        : A[K] extends EventShape<infer I>
+            ? (req: Infer<I>) => void
+            : A[K] extends ConfigShape<infer I>
+                ? Infer<I>
+                : A[K] extends StateShape<infer I>
+                    ? Infer<I>
+                    : never
+}
+export type Api<A extends Record<string, Amino>> = {
+    [K in keyof A]: A[K] extends QueryShape<infer I, infer O>
+        ? (req: Infer<I>) => Promise<Infer<O> | type.errors>
+        : A[K] extends EventShape<infer I>
+            ? (req: Infer<I>) => undefined | type.errors
+            : A[K] extends ConfigShape<infer I>
+                ? () => Infer<I>
+                : A[K] extends StateShape<infer I>
+                    ? { (val: Infer<I>): undefined | type.errors; (): Infer<I> }
+                    : never
+}
+
+export type Membrane<D extends Dna> = Api<PickByKind<D, Query | Event | Config | State>>
+export type HostTransport<D extends Dna> = Transport<PickByKind<D, Config | Event>>
+export type EndoTransport<D extends Dna> = Transport<PickByKind<D, Query>>
+
+export type Flora<G extends Genome> = {
+    nuclei: Transport<PickByKind<G["nuclei"], TransportableAminos>>
+    endo: G["endo"] extends DnaMap ? { [K in keyof G["endo"]]: EndoTransport<G["endo"][K]> } : never
+    host: G["host"] extends Dna ? HostTransport<G["host"]> : never
+}
+
+export type Integron<D extends Dna> = {
+    [K in keyof D as D[K] extends QueryShape | EventShape | ListenShape | StateShape ? K : never]: D[K] extends QueryShape<infer I, infer O>
+        ? (req: Infer<I>) => Promise<Infer<O>>
+        : D[K] extends EventShape<infer I>
+            ? (req: Infer<I>) => void
+            : D[K] extends ListenShape<infer I>
+                ? (req: Infer<I>) => void
+                : D[K] extends StateShape<infer I>
+                    ? (val: Infer<I>) => void
+                    : never
+}
+
+export type Nexus<G extends Genome> = Integron<G["nuclei"]> & ThisType<Flora<G>>
+
+export type Probe<A> =
+    A extends StateShape<infer I>
+        ? (arg: { prev: Infer<I>; next: Infer<I> }) => void
+        : A extends EventShape<infer I>
+            ? (arg: Infer<I>) => void
+            : A extends QueryShape<infer I, infer O>
+                ? (arg: { req: Infer<I>; res: Infer<O> }) => void
+                : never
+export type Probes<D extends Dna> = { [K in keyof PickByKind<D, ObservableAminos>]?: Probe<D[K]>[] }
+
+export type Inhibitor<A> =
+    A extends StateShape<infer I>
+        ? (arg: { prev: Infer<I>; next: Infer<I> }) => boolean
+        : A extends EventShape<infer I>
+            ? (arg: Infer<I>) => boolean
+            : A extends QueryShape<infer I, infer _O>
+                ? (arg: { req: Infer<I> }) => boolean
+                : never
+
+export type Inhibitors<D extends Dna> = { [K in keyof PickByKind<D, ObservableAminos>]?: Inhibitor<D[K]>[] }
+
+export type CisternInput<D extends Dna> = { [K in keyof D as D[K]["type"] extends Config ? K : never]: InferReq<D[K]> } & {
+    [K in keyof D as D[K]["type"] extends State ? K : never]?: InferReq<D[K]>
+}
+
+export type CisternStorage<D extends Dna> = {
+    [K in keyof D as D[K]["type"] extends CisternAminos ? K : never]-?: InferReq<D[K]>
+}
+
+class Cistern<D extends Dna> {
+    private storage = Object.create(null) as CisternStorage<D>
+    constructor(
+        public readonly dna: D,
+        input: CisternInput<D>
+    ) {
+        for (const [loci, amino] of entriesOf(dna)) {
+            if (!CisternAminos.includes(amino.type as any)) continue
+            const sKey = loci as keyof CisternStorage<D>
+            const iKey = loci as keyof CisternInput<D>
+
+            if (amino.type === AminoTypes.Config) {
+                const raw = input[iKey]
+                if (raw === undefined) panic(`Missing required config: ${String(loci)}`)
+                this.storage[sKey] = amino.req.assert(raw)
+            } else {
+                const raw = (input as any)[loci]
+                if (raw !== undefined) {
+                    this.storage[sKey] = amino.req.assert(raw)
+                } else {
+                    this.storage[sKey] = (amino as StateShape).def
+                }
+            }
+        }
+    }
+
+    get<K extends keyof CisternStorage<D>>(k: K) {
+        return this.storage[k]
+    }
+
+    setState<K extends keyof CisternStorage<D>>(k: K, val: any) {
+        if (this.dna[k]?.type === AminoTypes.State) this.storage[k] = val
+    }
+
+    extractType(type: typeof AminoTypes.Config | typeof AminoTypes.State) {
+        const res: any = {}
+        for (const [key, amino] of entriesOf(this.dna)) {
+            if (amino.type === type) res[key] = this.storage[key as keyof CisternStorage<D>]
+        }
+        return res
+    }
+    config(): PickByKind<D, Config> {
+        return this.extractType(AminoTypes.Config)
+    }
+    state(): PickByKind<D, State> {
+        return this.extractType(AminoTypes.State)
+    }
+}
+
+export type Mature<D extends Dna, G extends Genome> = [G["host"]] extends [never] ? Embryo<D> : Symbiote<D>
+
+export type Spawn<D extends Dna, G extends Genome> = [G["endo"]] extends [never]
+    ? [G["host"]] extends [never]
+        ? Embryo<D>
+        : Symbiote<D>
+    : Zygote<D, G>
+
+export type Endo<G> = G extends Genome ? { [K in keyof G["endo"]]: Organism<G["endo"][K], any> } : never
+
+export type AbsorbableCells<G> = G extends Genome ? { [K in keyof G["endo"]]: Symbiote<G["endo"][K]> } : never
+
+interface Progenitor {
+    name: string
+}
+interface Zygote<D extends Dna, G extends Genome<D>> extends Progenitor {
+    absorb(endo: AbsorbableCells<G>): Mature<D, G>
+}
+
+interface Symbiote<D extends Dna> extends Progenitor {
+    observe<K extends keyof PickByKind<D, ObservableAminos>>(locus: K, probe: Probe<D[K]>): () => void
+    inhibit<K extends keyof PickByKind<D, ObservableAminos>>(locus: K, inhibitor: Inhibitor<D[K]>): () => void
+    subscribe(obs: Observer): () => void
+}
+interface Imago<D extends Dna> extends Symbiote<D> {
+    api: Membrane<D>
+    trace(actionId: string): Membrane<D>
+    apoptosis(): void
+}
+interface Embryo<D extends Dna> extends Symbiote<D> {
+    genesis(): Imago<D>
+    alive: boolean
+}
+interface AbsorbedSymbiote<D extends Dna> extends Symbiote<D> {
+    integron: Integron<D>
+    apoptosis(): void
+}
+
+export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zygote<D, G>, Symbiote<D>, AbsorbedSymbiote<D>, Embryo<D>, Imago<D> {
+    public cistern = {} as Cistern<D>
+    public integron = {} as Integron<D>
+    public api = {} as Membrane<D>
+    public transport = {} as Transport<D>
+    public flora: Flora<G> | undefined
+
+    public host: Organism<any, any> | undefined
+    private endo = {} as Endo<G>
+
+    private probes: Probes<D> = {}
+    private inhibitors: Inhibitors<D> = {}
+    private observers: Observer[] = []
+    public currentActionId: string | null = null
+
+    public alive: boolean = false
+    public imago: boolean = false
+    public readonly dna: D
+
+    constructor(
+        dna: D,
+        private nexus: Nexus<G>,
+        cisternInput: CisternInput<G["nuclei"]>,
+        public name: string = generateShortId()
+    ) {
+        this.name = name
+        this.dna = dna
+        if (cisternInput) this.cistern = new Cistern(dna, cisternInput as CisternInput<D>)
+    }
+
+    public genesis() {
+        if (this.alive) panic("Already alive")
+        this.transport = this.createTransport()
+
+        var flora: Flora<G> = {
+            nuclei: this.transport,
+            endo: {} as any,
+            host: this.host?.transportForChild() as any,
+        }
+
+        for (const [key, child] of entriesOf(this.endo)) {
+            child.host = this as any
+            child.genesis()
+            flora.endo[key] = child.transportForHost() as any
+        }
+
+        this.flora = flora
+
+        this.integron = this.bindNexus(this.nexus)
+        this.api = this.createMembraneProxy()
+        this.alive = true
+        if (!this.endo["host"]) this.imago = true
+        return this as Imago<D>
+    }
+
+    private bindNexus(nexus: Nexus<G>) {
+        const boundImplementation: any = {}
+        for (const key in nexus) {
+            const value = nexus[key]
+            if (typeof value === "function") {
+                boundImplementation[key] = value.bind(this.flora)
+            } else {
+                boundImplementation[key] = value
+            }
+        }
+        return boundImplementation
+    }
+
+    private createMembraneProxy(): Membrane<D> {
+        return new Proxy(this.transport as any, {
+            get: (target, prop, _receiver) => {
+                if (!this.alive) panic("Api calls only allowed on imago.")
+
+                const amino = this.dna[prop as string]
+                if (!amino) return undefined
+
+                if (amino.type === AminoTypes.State || amino.type === AminoTypes.Config) {
+                    return (...args: any[]) => {
+                        if (args.length === 0) {
+                            return this.cistern.get(prop as any)
+                        }
+                        if (amino.type === AminoTypes.State) {
+                            const result = amino.req(args[0])
+                            if (result instanceof type.errors) return result
+
+                            target[prop] = result
+                            return undefined
+                        }
+
+                        panic(`Config "${String(prop)}" is read-only.`)
+                    }
+                }
+                const originalMethod = target[prop]
+                if (typeof originalMethod === "function") {
+                    return (input: unknown) => {
+                        const result = amino.req(input)
+                        if (result instanceof type.errors) return result
+                        return originalMethod(result)
+                    }
+                }
+            },
+            set: () => {
+                panic("Direct assignment to API is not allowed. Use api.property(value) instead.")
+            },
+        }) as Membrane<D>
+    }
+
+    transportForChild(): EndoTransport<D> {
+        return this.createTransport([AminoTypes.Config, AminoTypes.Event])
+    }
+
+    transportForHost(): HostTransport<D> {
+        return this.createTransport([AminoTypes.Query])
+    }
+
+    private createTransport(types?: AminoKind[]): Transport<D> {
+        const res: any = Object.create(null)
+
+        for (const [key, amino] of entriesOf(this.dna)) {
+            if (amino.type === AminoTypes.Listen) continue
+            if (types && !types.includes(amino.type)) continue
+
+            const ckey = key as keyof CisternStorage<D>
+            const oKey = key as keyof PickByKind<D, ObservableAminos>
+
+            switch (amino.type) {
+                case AminoTypes.Config: {
+                    Object.defineProperty(res, key, {
+                        enumerable: true,
+                        configurable: false,
+                        get: () => this.cistern.get(ckey),
+                    })
+                    break
+                }
+                case AminoTypes.Event: {
+                    res[key] = (req: unknown) => {
+                        if (this.isInhibited(oKey, req)) return
+                        this.emit({ type: "cell:event", locus: key as string, value: req })
+                        this.integron[key](req)
+                        this.dispatchEvent(key, req)
+                        this.notifyProbes(oKey, req)
+                    }
+                    break
+                }
+                case AminoTypes.State: {
+                    Object.defineProperty(res, key, {
+                        enumerable: true,
+                        configurable: false,
+                        get: () => this.cistern.get(ckey),
+                        set: (v: unknown) => {
+                            const prev = this.cistern.get(ckey)
+                            const next = v
+
+                            if (Object.is(prev, next)) return
+                            if (this.isInhibited(oKey, { prev, next })) return
+                            this.emit({ type: "cell:update", locus: key as string, prev, next, value: next })
+                            this.cistern.setState(ckey, next)
+                            this.integron[key](next)
+                            this.dispatchEvent(key, { prev, next })
+                            this.notifyProbes(oKey, { prev, next })
+                        },
+                    })
+                    break
+                }
+                case AminoTypes.Query: {
+                    res[key] = async (req: unknown) => {
+                        if (this.isInhibited(oKey, { req })) throw new Inhibited(`${String(key)}`)
+                        this.emit({ type: "cell:compute:start", locus: key as string })
+                        const result = await this.integron[key]?.(req)
+                        this.notifyProbes(oKey, { req, res: result })
+                        this.emit({ type: "cell:compute:end", locus: key as string, value: result })
+
+                        return result
+                    }
+                    break
+                }
+            }
+        }
+        return res
+    }
+
+    absorb(endo: AbsorbableCells<G>): Mature<D, G> {
+        for (const locus in endo) {
+            this.endo[locus] = endo[locus] as any
+        }
+        return this as Mature<D, G>
+    }
+
+    public subscribe(obs: Observer) {
+        this.observers.push(obs)
+        return () => {
+            this.observers = this.observers.filter(o => o !== obs)
+        }
+    }
+
+    public emit(event: TransportEvent | DistributiveOmit<TransportEvent, "cellId" | "actionId" | "timestamp">) {
+        var fullEvent: TransportEvent
+        if ("cellId" in event) {
+            fullEvent = event as TransportEvent
+        } else {
+            fullEvent = {
+                ...event,
+                cellId: this.name,
+                actionId: this.currentActionId ?? "system",
+                timestamp: Date.now(),
+            } as TransportEvent
+        }
+
+        this.observers.forEach(o => o(fullEvent))
+        this.host?.emit(fullEvent)
+    }
+
+    public trace(actionId: string): Membrane<D> {
+        return new Proxy(this.api, {
+            get: (target, prop) => {
+                const original = target[prop as keyof typeof target]
+                if (typeof original !== "function") return original
+
+                return (...args: any[]) => {
+                    const previousId = this.currentActionId
+                    this.currentActionId = actionId
+                    try {
+                        const result = (original as any)(...args)
+                        if (result instanceof Promise) {
+                            return result.finally(() => {
+                                this.currentActionId = previousId
+                            })
+                        }
+                        return result
+                    } finally {
+                        if (!(original instanceof Promise)) {
+                            this.currentActionId = previousId
+                        }
+                    }
+                }
+            },
+        })
+    }
+
+    public observe<K extends keyof PickByKind<D, ObservableAminos>>(locus: K, probe: Probe<D[K]>): () => void {
+        if (!this.probes[locus]) {
+            this.probes[locus] = []
+        }
+        this.probes[locus]?.push(probe)
+
+        return () => {
+            const list = this.probes[locus]
+            if (list) {
+                const idx = list.indexOf(probe)
+                if (idx > -1) list.splice(idx, 1)
+            }
+        }
+    }
+
+    inhibit<K extends keyof PickByKind<D, ObservableAminos>>(locus: K, inhibitor: Inhibitor<D[K]>): () => void {
+        if (!this.inhibitors[locus]) {
+            this.inhibitors[locus] = []
+        }
+        this.inhibitors[locus]?.push(inhibitor)
+
+        return () => {
+            const list = this.inhibitors[locus]
+            if (list) {
+                const idx = list.indexOf(inhibitor)
+                if (idx > -1) list.splice(idx, 1)
+            }
+        }
+    }
+
+    apoptosis() {
+        if (!this.alive) return
+        this.alive = false
+        for (const k in this.endo) {
+            this.endo[k]?.apoptosis()
+        }
+        this.probes = {}
+        this.inhibitors = {}
+    }
+
+    private callListen(key: PropertyKey, data: unknown) {
+        const handler = this.integron[key as keyof Integron<D>]
+        if (handler) {
+            this.emit({ type: "cell:listen", locus: key as string, value: data })
+            return handler(data)
+        }
+    }
+
+    public dispatchEvent(key: keyof D, value: unknown) {
+        for (const k in this.endo) {
+            const child = this.endo[k]
+            if (!child) continue
+            for (const ck in child.dna) {
+                if (ck === key) {
+                    child.currentActionId = this.currentActionId
+                    const cAmino = child.dna[ck]
+                    if (cAmino.type === AminoTypes.Listen) {
+                        child.callListen(ck, value)
+                    }
+                }
+            }
+        }
+    }
+
+    public notifyProbes(key: keyof PickByKind<D, ObservableAminos>, value: any) {
+        const probes = this.probes[key]
+        if (!probes) return
+
+        probes.forEach(probe => {
+            try {
+                probe(value)
+            } catch (_error) {
+                panic(`Probe error for ${String(key)}:`)
+            }
+        })
+    }
+
+    public isInhibited(key: keyof PickByKind<D, ObservableAminos>, value: any): boolean {
+        const list = this.inhibitors[key]
+        if (!list) return false
+        return list.some(inhibitor => {
+            try {
+                return inhibitor(value) === true
+            } catch (_e) {
+                panic(`Inhibitor failed for ${String(key)}`)
+            }
+        })
+    }
+}
+
+export const generateShortId = (): string => Math.random().toString(36).substring(2, 11)
+
+
+
+type DnaInfer<M> = M extends Module<infer T> ? T : never
+
+type AsModule<T> = T extends Scope<infer S extends {}> ? Module<S> : T extends Module ? T : T extends object ? Module<scope.infer<T>> : never
+
+function extractDnaDefinition(mod: Module<any>): Record<string, Amino> {
+    const result: Record<string, Amino> = {}
+
+    for (const [key, value] of Object.entries(mod)) {
+        const t = value as any
+        const typeNode = t.get("type")
+        const kind = typeNode.unit ?? typeNode.infer
+
+        if (kind === AminoTypes.Query) {
+            result[key] = {
+                type: AminoTypes.Query,
+                req: t.get("req"),
+                res: t.get("res"),
+            }
+        }
+        if (kind === AminoTypes.State) {
+            const props = (t as any).props as any[] | undefined
+            const reqProp = props?.find(p => p.key === "req")
+
+            result[key] = {
+                type: AminoTypes.State,
+                req: t.get("req"),
+                def: reqProp?.default,
+            }
+        } else {
+            result[key] = {
+                type: kind,
+                req: t.get("req"),
+            } as Amino
+        }
+    }
+    return result
+}
+
+function asModule(dnaLike: any): Module<any> {
+    if (dnaLike && typeof dnaLike === "object" && arkKind in dnaLike) {
+        if ("export" in dnaLike && typeof dnaLike.export === "function") {
+            return dnaLike.export()
+        }
+        return dnaLike as Module<any>
+    }
+    return type.module(dnaLike)
+}
+
+function isMatureDna(dnaLike: any): dnaLike is Record<string, Amino> {
+    if (!dnaLike || typeof dnaLike !== "object" || arkKind in dnaLike) return false
+    const values = Object.values(dnaLike)
+    if (values.length === 0) return false
+    const first = values[0] as any
+    return first && typeof first === "object" && "type" in first && "req" in first && typeof first.req === "function" && arkKind in first.req
+}
+
+export type AsGenome<T> = T extends Genome ? T : T extends Dna ? Genome<T, never, never> : never
+
+export const Lab = {
+    clone: <T extends Dna | Genome, G extends Genome = AsGenome<T>>(
+        dna: T extends Genome ? T["nuclei"] : T,
+        nexus: Nexus<G>,
+        cisternInput: CisternInput<G["nuclei"]>,
+        id?: string
+    ) => {
+        return new Organism(dna, nexus, cisternInput, id) as unknown as Spawn<G["nuclei"], G>
+    },
+
+    sequence<T>(dnaLike: T): Lab.Sequencer<T> {
+        let result: Record<string, Amino>
+        if (isMatureDna(dnaLike)) {
+            result = dnaLike
+        } else {
+            const mod = asModule(dnaLike)
+            result = extractDnaDefinition(mod)
+        }
+
+        return result as any
+    },
+}
+
+export namespace Lab {
+    export type Craft<G extends Genome> = Nexus<G>
+    export type Sequencer<T> = T extends Dna ? T : DnaInfer<AsModule<T>>
+
+    export type Build<N extends Dna, A extends DnaMap = never, B extends Dna = never> = {
+        nuclei: N
+        readonly _endo: A
+        readonly _host: B
+        endo<NewA extends DnaMap>(endo: NewA): Build<N, NewA, B>
+        host<NewB extends Dna>(host: NewB): Build<N, A, NewB>
+    }
+
+    export type Mix<N extends Dna, A extends DnaMap = never, B extends Dna = never> = Genome<N, A, B>
+}
+
+export const Config = <const I>(req: I) => ({ type: "'config'" as const, req })
+export const Event = <const I>(req: I) => ({ type: "'event'" as const, req })
+export const Listen = <const I>(req: I) => ({ type: "'listen'" as const, req })
+export const State = <const I>(req: I) => ({ type: "'state'" as const, req, def: "unknown.any" as const })
+export const Query = <const I, const O>(req: I, res: O) => ({ type: "'query'" as const, req, res })
