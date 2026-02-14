@@ -24,12 +24,12 @@
   "author": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-org/arkcells.git"
+    "url": "git+https://github.com/karolrybak/arkcells.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/arkcells/issues"
+    "url": "https://github.com/karolrybak/arkcells/issues"
   },
-  "homepage": "https://github.com/your-org/arkcells#readme",
+  "homepage": "https://github.com/karolrybak/arkcells#readme",
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"
