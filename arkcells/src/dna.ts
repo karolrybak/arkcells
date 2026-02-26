@@ -38,6 +38,9 @@ export type InferReq<A> = A extends { req: infer R }
 export type InferRes<A> = A extends { res: Type<any> } ? A["res"]["infer"] : never
 export type Infer<Def> = Type<Def>["infer"]
 
+export type IsAny<T> = 0 extends 1 & T ? true : false
+export type SpreadArgs<T> = IsAny<T> extends true ? [T] : [T] extends [readonly any[]] ? T : [T]
+
 export type Dna<T extends Record<string, Amino> = Record<string, Amino>> = T
 export type DnaMap<T extends Record<string, Dna> = Record<string, Dna>> = T
 export type Genome<N extends Dna = any, E extends DnaMap = any, H extends Dna | undefined = any> = { nuclei: N; endo: E; host: H }

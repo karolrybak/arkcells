@@ -15,6 +15,7 @@ import {
 	type PickByKind,
 	type QueryShape,
 	type StateShape,
+	type SpreadArgs,
 } from "./dna"
 import { Inhibited, panic } from "./error"
 
@@ -44,9 +45,9 @@ type Observer = (event: TransportEvent) => void
 
 export type Transport<A extends Record<string, Amino>> = {
 	[K in keyof A]: A[K] extends QueryShape<infer I, infer O>
-		? (req: Infer<I>) => Promise<Infer<O>>
+		? (...req: SpreadArgs<Infer<I>>) => Promise<Infer<O>>
 		: A[K] extends EventShape<infer I>
-			? (req: Infer<I>) => void
+			? (...req: SpreadArgs<Infer<I>>) => void
 			: A[K] extends ConfigShape<infer I>
 				? Infer<I>
 				: A[K] extends StateShape<infer I>
@@ -55,9 +56,9 @@ export type Transport<A extends Record<string, Amino>> = {
 }
 export type Api<A extends Record<string, Amino>> = {
 	[K in keyof A]: A[K] extends QueryShape<infer I, infer O>
-		? (req: Infer<I>) => Promise<Infer<O> | type.errors>
+		? (...req: SpreadArgs<Infer<I>>) => Promise<Infer<O> | type.errors>
 		: A[K] extends EventShape<infer I>
-			? (req: Infer<I>) => undefined | type.errors
+			? (...req: SpreadArgs<Infer<I>>) => undefined | type.errors
 			: A[K] extends ConfigShape<infer I>
 				? () => Infer<I>
 				: A[K] extends StateShape<infer I>
@@ -77,11 +78,11 @@ export type Flora<G extends Genome> = {
 
 export type Integron<D extends Dna> = {
 	[K in keyof D as D[K] extends QueryShape | EventShape | ListenShape | StateShape ? K : never]: D[K] extends QueryShape<infer I, infer O>
-		? (req: Infer<I>) => Promise<Infer<O>>
+		? (...req: SpreadArgs<Infer<I>>) => Promise<Infer<O>>
 		: D[K] extends EventShape<infer I>
-			? (req: Infer<I>) => void
+			? (...req: SpreadArgs<Infer<I>>) => void
 			: D[K] extends ListenShape<infer I>
-				? (req: Infer<I>) => void
+				? (...req: SpreadArgs<Infer<I>>) => void
 				: D[K] extends StateShape<infer I>
 					? (val: Infer<I>) => void
 					: never
@@ -239,7 +240,7 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 		if (this.alive) panic("Already alive")
 		this.transport = this.createTransport()
 
-		var flora: Flora<G> = {
+		let flora: Flora<G> = {
 			nuclei: this.transport,
 			endo: {} as any,
 			host: this.host?.transportForChild() as any,
@@ -299,10 +300,22 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 				}
 				const originalMethod = target[prop]
 				if (typeof originalMethod === "function") {
-					return (input: unknown) => {
-						const result = amino.req(input)
-						if (result instanceof type.errors) return result
-						return originalMethod(result)
+					return (...args: any[]) => {
+						if (args.length > 1) {
+							const result = amino.req(args)
+							if (result instanceof type.errors) return result
+							return originalMethod(...(result as any[]))
+						} else {
+							const singleResult = amino.req(args[0])
+							if (!(singleResult instanceof type.errors)) {
+								return originalMethod(singleResult)
+							}
+							const arrayResult = amino.req(args)
+							if (!(arrayResult instanceof type.errors)) {
+								return originalMethod(...(arrayResult as any[]))
+							}
+							return singleResult
+						}
 					}
 				}
 			},
@@ -340,11 +353,16 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 					break
 				}
 				case AminoTypes.Event: {
-					res[key] = (req: unknown) => {
+					res[key] = (...args: any[]) => {
+						let req = args.length === 1 ? args[0] : args
+						const validatedAsArray = amino.req(args)
+						if (!(validatedAsArray instanceof type.errors)) {
+							req = validatedAsArray
+						}
 						if (this.isInhibited(oKey, req)) return
 						this.emit({ type: "cell:event", locus: key as string, value: req })
-						this.integron[key](req)
-						this.dispatchEvent(key, req)
+						;(this.integron as any)[key](...args)
+						this.dispatchEvent(key, args)
 						this.notifyProbes(oKey, req)
 					}
 					break
@@ -370,10 +388,15 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 					break
 				}
 				case AminoTypes.Query: {
-					res[key] = async (req: unknown) => {
+					res[key] = async (...args: any[]) => {
+						let req = args.length === 1 ? args[0] : args
+						const validatedAsArray = amino.req(args)
+						if (!(validatedAsArray instanceof type.errors)) {
+							req = validatedAsArray
+						}
 						if (this.isInhibited(oKey, { req })) throw new Inhibited(`${String(key)}`)
 						this.emit({ type: "cell:compute:start", locus: key as string })
-						const result = await this.integron[key]?.(req)
+						const result = await (this.integron as any)[key]?.(...args)
 						this.notifyProbes(oKey, { req, res: result })
 						this.emit({ type: "cell:compute:end", locus: key as string, value: result })
 
@@ -401,7 +424,7 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 	}
 
 	public emit(event: TransportEvent | DistributiveOmit<TransportEvent, "cellId" | "actionId" | "timestamp">) {
-		var fullEvent: TransportEvent
+		let fullEvent: TransportEvent
 		if ("cellId" in event) {
 			fullEvent = event as TransportEvent
 		} else {
@@ -432,12 +455,13 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 							return result.finally(() => {
 								this.currentActionId = previousId
 							})
-						}
-						return result
-					} finally {
-						if (!(original instanceof Promise)) {
+						} else {
 							this.currentActionId = previousId
+							return result
 						}
+					} catch (e) {
+						this.currentActionId = previousId
+						throw e
 					}
 				}
 			},
@@ -484,15 +508,21 @@ export class Organism<D extends Dna, G extends Genome> implements Progenitor, Zy
 		this.inhibitors = {}
 	}
 
-	private callListen(key: PropertyKey, data: unknown) {
+	private callListen(key: PropertyKey, argsOrData: any) {
 		const handler = this.integron[key as keyof Integron<D>]
 		if (handler) {
-			this.emit({ type: "cell:listen", locus: key as string, value: data })
-			return handler(data)
+			if (Array.isArray(argsOrData)) {
+				const locusValue = argsOrData.length === 1 ? argsOrData[0] : argsOrData
+				this.emit({ type: "cell:listen", locus: key as string, value: locusValue })
+				return (handler as any)(...argsOrData)
+			} else {
+				this.emit({ type: "cell:listen", locus: key as string, value: argsOrData })
+				return (handler as any)(argsOrData)
+			}
 		}
 	}
 
-	public dispatchEvent(key: keyof D, value: unknown) {
+	public dispatchEvent(key: keyof D, value: any) {
 		for (const k in this.endo) {
 			const child = this.endo[k]
 			if (!child) continue

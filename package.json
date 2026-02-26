@@ -1,6 +1,6 @@
 {
   "name": "arkcells-monorepo",
-  "version": "0.0.56",
+  "version": "0.0.58",
   "private": true,
   "type": "module",
   "workspaces": [
